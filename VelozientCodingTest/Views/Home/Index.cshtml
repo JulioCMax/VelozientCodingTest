@@ -1,0 +1,237 @@
+﻿<div class="jumbotron">
+    <h2>Passwords</h2>
+    <button type="button" class="btn btn-primary" onclick="ShowNewModal()">
+        <i class="glyphicon glyphicon-plus"></i> New Password
+    </button>
+    <hr />
+    <div class="form-inline">
+        <input class="form-control" placeholder="Search" id="txtSearch" />
+        <button class="btn btn-info" onclick="SearchCard()"><i class="glyphicon glyphicon-search"></i> Search</button>
+    </div>
+</div>
+<div class="row" id="cardListContent">
+</div>
+
+
+<!-- Modal -->
+<div class="modal fade" id="cardModal" role="dialog" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="lblModal">Password</h3>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <input type="hidden" class="form-control" placeholder="URL" id="txtId" />
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>URL:</label>
+                            <input class="form-control" placeholder="URL" id="txtURL" />
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Name:</label>
+                            <input class="form-control" placeholder="Name" id="txtName" />
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Username:</label>
+                            <input class="form-control" placeholder="Username" id="txtUsername" />
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Password:</label>
+
+                            <div class="input-group">
+                                <div class="input-group-addon">
+                                    <span class="glyphicon glyphicon-copy passBtnHover" onclick="CopyPassword()" title="Copy"></span>
+                                </div>
+                                <input type="password" class="form-control" placeholder="Password" id="txtPassword" />
+                                <div class="input-group-addon">
+                                    <span class="glyphicon glyphicon-eye-open passBtnHover" onclick="ShowHidePassword(this)" title="Show/Hide"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="SaveCard()">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+
+    var cardList = [];
+
+    window.onload = function () {
+        GetCards();
+    };
+
+    function GetCards() {
+        $.ajax({
+            type: "GET",
+            url: "/password-cards",
+            success: success
+        });
+
+        function success(res) {
+            cardList = res;
+
+            CreateCardHTML(res);
+        }
+    }
+
+    function SaveCard() {
+
+        var method = "POST";
+        var url = "/password-cards";
+        var data = {
+            Id: $("#txtId").val(),
+            URL: $("#txtURL").val(),
+            Name: $("#txtName").val(),
+            Username: $("#txtUsername").val(),
+            Password: $("#txtPassword").val(),
+        };
+
+        if (data.Id > 0) {
+            method = 'PUT';
+            url = "/password-cards/" + data.Id;
+        }
+
+        $.ajax({
+            type: method,
+            url: url,
+            data: data,
+            success: success,
+            dataType: "json"
+        });
+
+        function success(res) {
+            if (res)
+                $("#cardModal").modal('hide');
+
+            GetCards();
+        }
+    }
+
+    function DeleteCard(id) {
+
+        $.ajax({
+            type: "DELETE",
+            url: "/password-cards/" + id,
+            success: success,
+            dataType: "json"
+        });
+
+        function success(res) {
+            if (res) {
+                $("#cardModal").modal('hide');
+            }
+            GetCards();
+        }
+    }
+
+    function EditCard(id) {
+        $("#cardModal").modal('show');
+        $("#lblModal").html('Edit Password');
+
+        var card = cardList.filter((x) => { return x.Id == id; })[0];
+
+        $("#txtId").val(card.Id);
+        $("#txtURL").val(card.URL);
+        $("#txtName").val(card.Name);
+        $("#txtUsername").val(card.Username);
+        $("#txtPassword").val(card.Password);
+    }
+
+    function ShowNewModal() {
+        $("#cardModal").modal('show');
+        $("#lblModal").html('New Password');
+
+        $("#txtId").val('');
+        $("#txtURL").val('');
+        $("#txtName").val('');
+        $("#txtUsername").val('');
+        $("#txtPassword").val('');
+    }
+
+    function SearchCard() {
+        var text = $('#txtSearch').val();
+
+        var filteredList = cardList.filter((x) => { return x.Name.includes(text); });
+
+        CreateCardHTML(filteredList);
+    }
+
+    function CreateCardHTML(list) {
+
+        $('#cardListContent').html('');
+
+        var template = `
+                <div class="col-md-4">
+                    <div class="panel panel-default">
+                        <div class="panel-body">
+                            <h2 class="text-center">{Name}</h2>
+                        </div>
+                        <div class="panel-footer">
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <div class="btn-group pull-right">
+                                        <button class="btn btn-warning" onclick="EditCard({id})"><i class="glyphicon glyphicon-pencil"></i> Edit</button>
+                                        <button class="btn btn-danger" onclick="DeleteCard({id})"><i class="glyphicon glyphicon-trash"></i> Delete</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+        for (var i = 0; i < list.length; i++) {
+            var item = list[i];
+            var newCard = template;
+            newCard = newCard.replace('{Name}', item.Name);
+            newCard = newCard.replaceAll('{id}', item.Id);
+
+            $('#cardListContent').append(newCard);
+        }
+    }
+
+    function ShowHidePassword(btnEye) {
+
+        if ($(btnEye).hasClass("glyphicon-eye-open")) {
+            $("#txtPassword").prop("type", "text");
+
+            $(btnEye).removeClass("glyphicon-eye-open");
+            $(btnEye).addClass("glyphicon-eye-close");
+        } else {
+            $("#txtPassword").prop("type", "password");
+
+            $(btnEye).addClass("glyphicon-eye-open");
+            $(btnEye).removeClass("glyphicon-eye-close");
+        }
+    }
+
+    function CopyPassword() {
+
+        var textArea = document.createElement("textarea");
+        textArea.value = $("#txtPassword").val();
+        document.body.appendChild(textArea);
+
+        textArea.select();
+
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+    }
+</script>
+<style>
+    .passBtnHover:hover {
+        cursor: pointer
+    }
+</style>
